@@ -68,13 +68,20 @@ where
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
+    let mut url = opt.url.clone();
 
-    let master: VimeoResponse = _reqwest::get(opt.url.clone())
+    // ensure that we get the init segment as a base64 value
+    url.query_pairs_mut()
+        .clear()
+        .append_pair("base64_init", "1");
+
+    let master: VimeoResponse = _reqwest::get(url.clone())
         .context("failed to get response from vimeo")?
         .json()
         .context("failed to parse vimeo master.json")?;
-    let base_url = Url::join(&opt.url, &master.base_url)?;
+    let base_url = Url::join(&url, &master.base_url)?;
 
+    // grab the best video quality available
     let video = master
         .video
         .iter()
@@ -86,6 +93,7 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("Vimeo URL contained no video streams"))?
         .clone();
 
+    // grab the best audio quality available
     let audio = master
         .audio
         .iter()
@@ -129,6 +137,8 @@ fn main() -> Result<()> {
     });
 
     merge(&audio, &video, &filename, &out_dir)?;
+
+    println!("\n\nVideo output: {:?}", &out_dir.join(&filename));
 
     Ok(())
 }
